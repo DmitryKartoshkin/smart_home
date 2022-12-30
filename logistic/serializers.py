@@ -7,16 +7,16 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['id', 'title', 'description']
 
+
 class ProductPositionSerializer(serializers.ModelSerializer):
-    # product = serializers.StringRelatedField(many=True, read_only=True)
-    # product_name = serializers.ReadOnlyField(source='product.title')
-    # product_description = serializers.ReadOnlyField(source='product.description')
     class Meta:
         model = StockProduct
         fields = ['quantity', 'price', 'product']
 
+
 class StockSerializer(serializers.ModelSerializer):
     positions = ProductPositionSerializer(many=True)
+
     class Meta:
         model = Stock
         fields = ['id', 'address', 'positions']
@@ -24,25 +24,30 @@ class StockSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # достаем связанные данные для других таблиц
         positions = validated_data.pop('positions')
-
         # создаем склад по его параметрам
         stock = super().create(validated_data)
-
-        # здесь вам надо заполнить связанные таблицы
-        # в нашем случае: таблицу StockProduct
-        # с помощью списка positions
-
+        list_ = []
+        for position in positions:
+            stocks_product = StockProduct(stock=stock, **position)
+            list_.append(stocks_product)
+        StockProduct.objects.bulk_create(list_)
         return stock
 
     def update(self, instance, validated_data):
         # достаем связанные данные для других таблиц
         positions = validated_data.pop('positions')
-
         # обновляем склад по его параметрам
         stock = super().update(instance, validated_data)
-
-        # здесь вам надо обновить связанные таблицы
-        # в нашем случае: таблицу StockProduct
-        # с помощью списка positions
-
+        for el in positions:
+            product = el.pop('product')
+            StockProduct.objects.update_or_create(stock=stock,
+                                                  product=product,
+                                                  defaults=
+                                                  {'quantity': el['quantity'],
+                                                   'price': el['price']
+                                                   }
+                                                  )
         return stock
+
+
+
